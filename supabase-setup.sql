@@ -49,3 +49,9 @@ $$;
 -- ============================================================
 -- Done! Your database is ready.
 -- ============================================================
+
+-- 8. Allow anyone to delete jokes (for self-moderation)
+-- Run this if you want users to be able to delete their own dispatches
+create policy "Anyone can delete jokes"
+  on jokes for delete
+  using (true);

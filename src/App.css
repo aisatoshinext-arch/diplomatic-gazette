@@ -817,3 +817,29 @@
   margin-bottom: 1rem;
   border-radius: 0 2px 2px 0;
 }
+
+/* ── DELETE BUTTON ── */
+.delete-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.delete-btn:hover {
+  color: var(--trump-accent);
+  border-color: var(--trump-accent);
+}
+
+.delete-btn.confirming {
+  color: var(--trump-accent);
+  border-color: var(--trump-accent);
+  background: var(--trump-light);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}

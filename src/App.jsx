@@ -122,6 +122,28 @@ const SEED_JOKES = [
 
 // ─── UTILITIES ────────────────────────────────────────────────────────────────
 
+function getSessionId() {
+  try {
+    let id = localStorage.getItem('gazette-session-id')
+    if (!id) {
+      id = 'sess-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+      localStorage.setItem('gazette-session-id', id)
+    }
+    return id
+  } catch { return 'anon' }
+}
+
+function getMyJokeIds() {
+  try {
+    const s = localStorage.getItem('gazette-my-jokes')
+    return s ? new Set(JSON.parse(s)) : new Set()
+  } catch { return new Set() }
+}
+
+function saveMyJokeIds(set) {
+  try { localStorage.setItem('gazette-my-jokes', JSON.stringify([...set])) } catch {}
+}
+
 function getVotedSet() {
   try {
     const s = localStorage.getItem('gazette-voted-v2')
@@ -173,7 +195,14 @@ function LetterBody({ body, pullQuote }) {
   )
 }
 
-function JokeCard({ joke, onVote, hasVoted }) {
+function JokeCard({ joke, onVote, hasVoted, isOwn, onDelete }) {
+  const [confirming, setConfirming] = useState(false)
+
+  function handleDelete() {
+    if (!confirming) { setConfirming(true); return }
+    onDelete(joke.id)
+  }
+
   return (
     <div className="joke-card fade-in">
       <div className="joke-meta">
@@ -192,6 +221,16 @@ function JokeCard({ joke, onVote, hasVoted }) {
           <span className="vote-count">{joke.votes}</span>
         </button>
         {hasVoted && <span className="voted-label">dispatched</span>}
+        {isOwn && (
+          <button
+            className={`delete-btn ${confirming ? 'confirming' : ''}`}
+            onClick={handleDelete}
+            onBlur={() => setConfirming(false)}
+            aria-label="Delete dispatch"
+          >
+            {confirming ? 'Confirm?' : '✕'}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -267,6 +306,8 @@ export default function App() {
   const [jokes, setJokes] = useState([])
   const [loading, setLoading] = useState(true)
   const [voted, setVoted] = useState(getVotedSet)
+  const [myJokeIds, setMyJokeIds] = useState(getMyJokeIds)
+  const sessionId = getSessionId()
   const [showSubmit, setShowSubmit] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [sortBy, setSortBy] = useState('votes')
@@ -344,6 +385,9 @@ export default function App() {
         .from('jokes').insert([{ text, author, country, votes: 0 }]).select().single()
       if (error) throw error
       setJokes(prev => [data, ...prev])
+      const newMyIds = new Set([...myJokeIds, data.id])
+      setMyJokeIds(newMyIds)
+      saveMyJokeIds(newMyIds)
       setShowSubmit(false)
       setSortBy('recent')
       setSuccessMsg('Your dispatch has been filed. Margaret has been notified.')
@@ -353,6 +397,15 @@ export default function App() {
       alert('Transmission failed. Try again.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDelete(id) {
+    setJokes(prev => prev.filter(j => j.id !== id))
+    const { error } = await supabase.from('jokes').delete().eq('id', id)
+    if (error) {
+      console.error('Delete error:', error)
+      loadJokes()
     }
   }
 
@@ -457,7 +510,7 @@ export default function App() {
                 <p>Decrypting dispatches...</p>
               </div>
             ) : sortedJokes.map(joke => (
-              <JokeCard key={joke.id} joke={joke} onVote={handleVote} hasVoted={voted.has(joke.id)} />
+              <JokeCard key={joke.id} joke={joke} onVote={handleVote} hasVoted={voted.has(joke.id)} isOwn={myJokeIds.has(joke.id)} onDelete={handleDelete} />
             ))}
           </div>
 
