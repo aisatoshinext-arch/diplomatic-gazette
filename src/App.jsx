@@ -1,50 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import { supabase } from './supabase'
 
-// ─── DATA ────────────────────────────────────────────────────────────────────
-
-const SEED_JOKES = [
-  {
-    id: 'seed-1',
-    author: 'Margaret',
-    country: '🇨🇭',
-    text: "I agreed to hold the uranium but it conflicts with my Tuesday bridge game and my Thursday knitting circle. Also I have bridge on Saturdays too. I'm very busy.",
-    votes: 47,
-    timestamp: Date.now() - 86400000 * 3,
-  },
-  {
-    id: 'seed-2',
-    author: 'The Strait of Hormuz',
-    country: '🌊',
-    text: "Nobody ever asks how I'm doing. I'm just a body of water, trying to connect two seas, and somehow I end up in every diplomatic crisis since 1979. I didn't ask for this.",
-    votes: 89,
-    timestamp: Date.now() - 86400000 * 2,
-  },
-  {
-    id: 'seed-3',
-    author: 'Lloyd\'s of London',
-    country: '🇬🇧',
-    text: "We've increased premiums on 'diplomatic shipping lane' policies by 400%. We've also introduced a new product: 'Geopolitical Irony Insurance.' It covers you if peace breaks out and you don't know what to do.",
-    votes: 62,
-    timestamp: Date.now() - 86400000,
-  },
-  {
-    id: 'seed-4',
-    author: 'The Brent Crude Oil Barrel',
-    country: '🛢️',
-    text: "I just texted my ex. She's a natural gas pipeline in Kazakhstan. We had something real before the sanctions.",
-    votes: 103,
-    timestamp: Date.now() - 3600000 * 5,
-  },
-  {
-    id: 'seed-5',
-    author: 'Pakistan (Group Chat Admin)',
-    country: '🇵🇰',
-    text: "I have muted this group for 8 hours. This is my 14th time muting this group. I am keeping count. I have a spreadsheet.",
-    votes: 71,
-    timestamp: Date.now() - 3600000 * 2,
-  },
-]
+// ─── LETTERS DATA ─────────────────────────────────────────────────────────────
 
 const LETTERS = [
   {
@@ -124,12 +82,12 @@ const LETTERS = [
     subject: null,
     title: 'TOTALLY UNACCEPTABLE',
     from: '@realDonaldTrump',
-    dept: 'The Only One Who Read The Whole Thing (He Didn\'t)',
+    dept: "The Only One Who Read The Whole Thing (He Didn't)",
     pullQuote: '"Later is when you clean the garage. Later is not for uranium."',
     body: [
       { type: 'trump-header' },
-      { type: 'p', text: 'I have read Iran\'s response.' },
-      { type: 'p', text: 'Actually, I didn\'t need to read all of it. Very long. Too long. Too many commas. When a country uses that many commas, they are hiding uranium between the clauses.' },
+      { type: 'p', text: "I have read Iran's response." },
+      { type: 'p', text: "Actually, I didn't need to read all of it. Very long. Too long. Too many commas. When a country uses that many commas, they are hiding uranium between the clauses." },
       { type: 'unacceptable' },
       { type: 'p', text: 'We gave them a beautiful proposal. A perfect proposal. People saw the proposal and said, "Sir, this proposal is so strong, so elegant, maybe the best proposal since the Louisiana Purchase — which was also a tremendous real estate deal, frankly underpriced."' },
       {
@@ -154,45 +112,36 @@ const LETTERS = [
   },
 ]
 
-// ─── UTILITIES ───────────────────────────────────────────────────────────────
+const SEED_JOKES = [
+  { author: 'Margaret', country: '🇨🇭', text: "I agreed to hold the uranium but it conflicts with my Tuesday bridge game and my Thursday knitting circle. Also I have bridge on Saturdays too. I'm very busy.", votes: 47 },
+  { author: 'The Strait of Hormuz', country: '🌊', text: "Nobody ever asks how I'm doing. I'm just a body of water, trying to connect two seas, and somehow I end up in every diplomatic crisis since 1979. I didn't ask for this.", votes: 89 },
+  { author: "Lloyd's of London", country: '🇬🇧', text: "We've increased premiums on 'diplomatic shipping lane' policies by 400%. We've also introduced a new product: 'Geopolitical Irony Insurance.' It covers you if peace breaks out and you don't know what to do.", votes: 62 },
+  { author: 'The Brent Crude Oil Barrel', country: '🛢️', text: "I just texted my ex. She's a natural gas pipeline in Kazakhstan. We had something real before the sanctions.", votes: 103 },
+  { author: 'Pakistan (Group Chat Admin)', country: '🇵🇰', text: "I have muted this group for 8 hours. This is my 14th time muting this group. I am keeping count. I have a spreadsheet.", votes: 71 },
+]
 
-function loadJokes() {
+// ─── UTILITIES ────────────────────────────────────────────────────────────────
+
+function getVotedSet() {
   try {
-    const stored = localStorage.getItem('gazette-jokes')
-    if (stored) return JSON.parse(stored)
-  } catch {}
-  return SEED_JOKES
+    const s = localStorage.getItem('gazette-voted-v2')
+    return s ? new Set(JSON.parse(s)) : new Set()
+  } catch { return new Set() }
 }
 
-function saveJokes(jokes) {
-  try {
-    localStorage.setItem('gazette-jokes', JSON.stringify(jokes))
-  } catch {}
-}
-
-function loadVoted() {
-  try {
-    const stored = localStorage.getItem('gazette-voted')
-    if (stored) return new Set(JSON.parse(stored))
-  } catch {}
-  return new Set()
-}
-
-function saveVoted(voted) {
-  try {
-    localStorage.setItem('gazette-voted', JSON.stringify([...voted]))
-  } catch {}
+function saveVotedSet(set) {
+  try { localStorage.setItem('gazette-voted-v2', JSON.stringify([...set])) } catch {}
 }
 
 function timeAgo(ts) {
-  const diff = Date.now() - ts
+  const diff = Date.now() - new Date(ts).getTime()
   if (diff < 60000) return 'just now'
   if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
   return `${Math.floor(diff / 86400000)}d ago`
 }
 
-// ─── COMPONENTS ──────────────────────────────────────────────────────────────
+// ─── COMPONENTS ───────────────────────────────────────────────────────────────
 
 function LetterBody({ body, pullQuote }) {
   return (
@@ -213,8 +162,7 @@ function LetterBody({ body, pullQuote }) {
             <div className="demand-label">{block.label}</div>
             {block.items.map((item, j) => (
               <div key={j} className="demand-item">
-                <span className="demand-num">{j + 1}.</span>
-                {item}
+                <span className="demand-num">{j + 1}.</span>{item}
               </div>
             ))}
           </div>
@@ -231,14 +179,14 @@ function JokeCard({ joke, onVote, hasVoted }) {
       <div className="joke-meta">
         <span className="joke-flag">{joke.country}</span>
         <span className="joke-author">{joke.author}</span>
-        <span className="joke-time">{timeAgo(joke.timestamp)}</span>
+        <span className="joke-time">{timeAgo(joke.created_at)}</span>
       </div>
       <p className="joke-text">{joke.text}</p>
       <div className="joke-footer">
         <button
           className={`vote-btn ${hasVoted ? 'voted' : ''}`}
           onClick={() => onVote(joke.id)}
-          aria-label={hasVoted ? 'Already voted' : 'Upvote this joke'}
+          aria-label={hasVoted ? 'Already voted' : 'Upvote'}
         >
           <span className="vote-arrow">{hasVoted ? '▲' : '△'}</span>
           <span className="vote-count">{joke.votes}</span>
@@ -249,7 +197,7 @@ function JokeCard({ joke, onVote, hasVoted }) {
   )
 }
 
-function SubmitJokeForm({ onSubmit, onCancel }) {
+function SubmitJokeForm({ onSubmit, onCancel, submitting }) {
   const [text, setText] = useState('')
   const [author, setAuthor] = useState('')
   const [country, setCountry] = useState('🌍')
@@ -258,7 +206,7 @@ function SubmitJokeForm({ onSubmit, onCancel }) {
 
   useEffect(() => { textRef.current?.focus() }, [])
 
-  const EMOJIS = ['🌍','🇺🇸','🇮🇷','🇵🇰','🇨🇭','🇳🇴','🌊','🛢️','💣','🕊️','📱','🦝','👴','📰','🔬','💼','🎪']
+  const EMOJIS = ['🌍','🇺🇸','🇮🇷','🇵🇰','🇨🇭','🇳🇴','🌊','🛢️','💣','🕊️','📱','🦝','👴','📰','🔬','💼','🎪','🇬🇧','🇷🇺','🇨🇳','🇮🇱','🇸🇦']
 
   function handleSubmit() {
     if (!text.trim() || text.trim().length < 10) {
@@ -280,47 +228,33 @@ function SubmitJokeForm({ onSubmit, onCancel }) {
       </div>
       <div className="form-field">
         <label className="form-label">Your allegiance / handle</label>
-        <input
-          className="form-input"
-          type="text"
+        <input className="form-input" type="text"
           placeholder="e.g. The Raccoon, Anonymous Oil Barrel, Margaret..."
-          value={author}
-          onChange={e => setAuthor(e.target.value)}
-          maxLength={40}
-        />
+          value={author} onChange={e => setAuthor(e.target.value)} maxLength={40} />
       </div>
       <div className="form-field">
         <label className="form-label">Flag / entity symbol</label>
         <div className="emoji-picker">
           {EMOJIS.map(e => (
-            <button
-              key={e}
-              className={`emoji-btn ${country === e ? 'selected' : ''}`}
-              onClick={() => setCountry(e)}
-              type="button"
-            >
-              {e}
-            </button>
+            <button key={e} className={`emoji-btn ${country === e ? 'selected' : ''}`}
+              onClick={() => setCountry(e)} type="button">{e}</button>
           ))}
         </div>
       </div>
       <div className="form-field">
         <label className="form-label">Your dispatch</label>
-        <textarea
-          ref={textRef}
-          className="form-textarea"
+        <textarea ref={textRef} className="form-textarea"
           placeholder="Add your joke, observation, or diplomatic incident to the record. Margaret is watching."
-          value={text}
-          onChange={e => { setText(e.target.value); setError('') }}
-          maxLength={500}
-          rows={4}
-        />
+          value={text} onChange={e => { setText(e.target.value); setError('') }}
+          maxLength={500} rows={4} />
         <div className="char-count">{text.length}/500</div>
       </div>
       {error && <div className="form-error">{error}</div>}
       <div className="form-actions">
-        <button className="btn-cancel" onClick={onCancel} type="button">Abort Mission</button>
-        <button className="btn-submit" onClick={handleSubmit} type="button">Dispatch →</button>
+        <button className="btn-cancel" onClick={onCancel} type="button" disabled={submitting}>Abort Mission</button>
+        <button className="btn-submit" onClick={handleSubmit} type="button" disabled={submitting}>
+          {submitting ? 'Transmitting...' : 'Dispatch →'}
+        </button>
       </div>
     </div>
   )
@@ -330,57 +264,112 @@ function SubmitJokeForm({ onSubmit, onCancel }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('usa')
-  const [jokes, setJokes] = useState(loadJokes)
-  const [voted, setVoted] = useState(loadVoted)
+  const [jokes, setJokes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [voted, setVoted] = useState(getVotedSet)
   const [showSubmit, setShowSubmit] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [sortBy, setSortBy] = useState('votes')
   const [successMsg, setSuccessMsg] = useState('')
+  const [dbError, setDbError] = useState(false)
+
+  useEffect(() => {
+    loadJokes()
+
+    const channel = supabase
+      .channel('jokes-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jokes' }, payload => {
+        setJokes(prev => {
+          if (prev.find(j => j.id === payload.new.id)) return prev
+          return [payload.new, ...prev]
+        })
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'jokes' }, payload => {
+        setJokes(prev => prev.map(j => j.id === payload.new.id ? payload.new : j))
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  async function loadJokes() {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('jokes')
+        .select('*')
+        .order('votes', { ascending: false })
+      if (error) throw error
+      if (data.length === 0) { await seedJokes(); return }
+      setJokes(data)
+      setDbError(false)
+    } catch (err) {
+      console.error('Supabase error:', err)
+      setDbError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function seedJokes() {
+    const { data } = await supabase
+      .from('jokes')
+      .insert(SEED_JOKES.map(j => ({ author: j.author, country: j.country, text: j.text, votes: j.votes })))
+      .select()
+    if (data) setJokes(data.sort((a, b) => b.votes - a.votes))
+    setLoading(false)
+  }
+
+  async function handleVote(id) {
+    if (voted.has(id)) return
+    setJokes(prev => prev.map(j => j.id === id ? { ...j, votes: j.votes + 1 } : j))
+    const newVoted = new Set([...voted, id])
+    setVoted(newVoted)
+    saveVotedSet(newVoted)
+    const { error } = await supabase.rpc('increment_votes', { joke_id: id })
+    if (error) {
+      console.error('Vote error:', error)
+      setJokes(prev => prev.map(j => j.id === id ? { ...j, votes: j.votes - 1 } : j))
+      const rolled = new Set([...newVoted])
+      rolled.delete(id)
+      setVoted(rolled)
+      saveVotedSet(rolled)
+    }
+  }
+
+  async function handleSubmitJoke({ text, author, country }) {
+    setSubmitting(true)
+    try {
+      const { data, error } = await supabase
+        .from('jokes').insert([{ text, author, country, votes: 0 }]).select().single()
+      if (error) throw error
+      setJokes(prev => [data, ...prev])
+      setShowSubmit(false)
+      setSortBy('recent')
+      setSuccessMsg('Your dispatch has been filed. Margaret has been notified.')
+      setTimeout(() => setSuccessMsg(''), 4000)
+    } catch (err) {
+      console.error('Submit error:', err)
+      alert('Transmission failed. Try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const sortedJokes = [...jokes].sort((a, b) =>
-    sortBy === 'votes' ? b.votes - a.votes : b.timestamp - a.timestamp
+    sortBy === 'votes' ? b.votes - a.votes : new Date(b.created_at) - new Date(a.created_at)
   )
-
-  function handleVote(id) {
-    if (voted.has(id)) return
-    const newJokes = jokes.map(j => j.id === id ? { ...j, votes: j.votes + 1 } : j)
-    const newVoted = new Set([...voted, id])
-    setJokes(newJokes)
-    setVoted(newVoted)
-    saveJokes(newJokes)
-    saveVoted(newVoted)
-  }
-
-  function handleSubmitJoke({ text, author, country }) {
-    const newJoke = {
-      id: `user-${Date.now()}`,
-      author,
-      country,
-      text,
-      votes: 0,
-      timestamp: Date.now(),
-    }
-    const newJokes = [newJoke, ...jokes]
-    setJokes(newJokes)
-    saveJokes(newJokes)
-    setShowSubmit(false)
-    setSortBy('recent')
-    setSuccessMsg('Your dispatch has been filed. Margaret has been notified.')
-    setTimeout(() => setSuccessMsg(''), 4000)
-  }
 
   const letter = LETTERS.find(l => l.id === activeTab)
 
   return (
     <div className="app">
-      {/* ── MASTHEAD ── */}
       <header className="masthead">
         <div className="masthead-inner">
           <div className="masthead-eyebrow">Est. This Crisis · All Sources Unverified</div>
           <h1 className="masthead-title">The Diplomatic Gazette</h1>
           <p className="masthead-tagline">PEACE, PROBABLY</p>
-          <div className="masthead-rule-triple">
-            <span /><span /><span />
-          </div>
+          <div className="masthead-rule-triple"><span /><span /><span /></div>
           <div className="issue-line">
             <span>Vol. XLVII, No. 9</span>
             <span>Correspondence from the Axis of Mixed Signals</span>
@@ -389,28 +378,19 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── MAIN LAYOUT ── */}
       <main className="main-layout">
-
-        {/* ── LEFT COL: LETTERS ── */}
         <section className="letters-col">
-          {/* Tabs */}
           <div className="tab-bar" role="tablist">
             {LETTERS.map(l => (
-              <button
-                key={l.id}
-                role="tab"
-                aria-selected={activeTab === l.id}
+              <button key={l.id} role="tab" aria-selected={activeTab === l.id}
                 className={`tab-btn ${activeTab === l.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(l.id)}
-              >
+                onClick={() => setActiveTab(l.id)}>
                 <span className="tab-flag">{l.flag}</span>
                 <span className="tab-label">{l.label}</span>
               </button>
             ))}
           </div>
 
-          {/* Letter */}
           <article className={`letter letter-${letter.id} fade-in`} key={letter.id}>
             <div className="letter-header">
               <span className={`badge ${letter.badgeClass}`}>{letter.badgeText}</span>
@@ -421,18 +401,12 @@ export default function App() {
               )}
               <h2 className="letter-title">{letter.title}</h2>
               <p className="letter-from">
-                <strong>{letter.from}</strong>
-                <br />
+                <strong>{letter.from}</strong><br />
                 <span className="letter-dept">{letter.dept}</span>
               </p>
             </div>
-
-            <div className="letter-rule-triple">
-              <span /><span /><span />
-            </div>
-
+            <div className="letter-rule-triple"><span /><span /><span /></div>
             <LetterBody body={letter.body} pullQuote={letter.pullQuote} />
-
             {letter.signature && (
               <div className="letter-signature">
                 <p className="sig-close">{letter.signature}</p>
@@ -440,79 +414,60 @@ export default function App() {
                 <p className="sig-dept">{letter.dept}</p>
               </div>
             )}
-
-            {letter.footnote && (
-              <p className="letter-footnote">{letter.footnote}</p>
-            )}
+            {letter.footnote && <p className="letter-footnote">{letter.footnote}</p>}
           </article>
         </section>
 
-        {/* ── RIGHT COL: COMMUNITY JOKES ── */}
         <aside className="jokes-col">
           <div className="jokes-header">
             <div className="jokes-header-top">
               <h2 className="jokes-title">Intelligence Dispatches</h2>
               <span className="jokes-count">{jokes.length} filed</span>
             </div>
-            <p className="jokes-subtitle">Community-sourced intelligence. Accuracy not guaranteed. Margaret not responsible.</p>
+            <p className="jokes-subtitle">
+              Community intelligence. Shared by all visitors in real time. Accuracy not guaranteed.
+            </p>
           </div>
+
+          {dbError && (
+            <div className="db-error">
+              Connection issue — dispatches temporarily unavailable. The satellites are probably involved.
+            </div>
+          )}
 
           <div className="jokes-controls">
             <div className="sort-toggle">
-              <button
-                className={`sort-btn ${sortBy === 'votes' ? 'active' : ''}`}
-                onClick={() => setSortBy('votes')}
-              >
-                Top
-              </button>
-              <button
-                className={`sort-btn ${sortBy === 'recent' ? 'active' : ''}`}
-                onClick={() => setSortBy('recent')}
-              >
-                Recent
-              </button>
+              <button className={`sort-btn ${sortBy === 'votes' ? 'active' : ''}`} onClick={() => setSortBy('votes')}>Top</button>
+              <button className={`sort-btn ${sortBy === 'recent' ? 'active' : ''}`} onClick={() => setSortBy('recent')}>Recent</button>
             </div>
-            <button
-              className="add-joke-btn"
-              onClick={() => { setShowSubmit(!showSubmit); setSuccessMsg('') }}
-            >
+            <button className="add-joke-btn" onClick={() => { setShowSubmit(!showSubmit); setSuccessMsg('') }}>
               {showSubmit ? '✕ Cancel' : '+ File Dispatch'}
             </button>
           </div>
 
-          {successMsg && (
-            <div className="success-msg fade-in">
-              ✓ {successMsg}
-            </div>
-          )}
-
+          {successMsg && <div className="success-msg fade-in">✓ {successMsg}</div>}
           {showSubmit && (
-            <SubmitJokeForm
-              onSubmit={handleSubmitJoke}
-              onCancel={() => setShowSubmit(false)}
-            />
+            <SubmitJokeForm onSubmit={handleSubmitJoke} onCancel={() => setShowSubmit(false)} submitting={submitting} />
           )}
 
           <div className="jokes-list">
-            {sortedJokes.map(joke => (
-              <JokeCard
-                key={joke.id}
-                joke={joke}
-                onVote={handleVote}
-                hasVoted={voted.has(joke.id)}
-              />
+            {loading ? (
+              <div className="loading-state">
+                <div className="loading-dots"><span /><span /><span /></div>
+                <p>Decrypting dispatches...</p>
+              </div>
+            ) : sortedJokes.map(joke => (
+              <JokeCard key={joke.id} joke={joke} onVote={handleVote} hasVoted={voted.has(joke.id)} />
             ))}
           </div>
 
           <div className="jokes-footer">
-            <p>Dispatches are stored locally in your browser.</p>
+            <p>Dispatches are shared between all visitors in real time.</p>
             <p>Margaret has bridge on Tuesdays.</p>
           </div>
         </aside>
-
       </main>
 
-      {/* ── FOOTER ── */}
       <footer className="site-footer">
         <div className="footer-inner">
           <span className="footer-rule" />
